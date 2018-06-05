@@ -20,6 +20,7 @@ import lombok.Value;
 import org.apache.commons.collections.map.HashedMap;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.builder.CompareToBuilder;
+import org.apache.poi.ss.formula.functions.Column;
 import org.apache.wicket.model.StringResourceModel;
 import org.sakaiproject.gradebookng.business.GbCategoryType;
 import org.sakaiproject.gradebookng.business.GbRole;
@@ -63,6 +64,7 @@ public class GbGradebookData {
 		private String hasComments;
 		private String hasConcurrentEdit;
 		private String readonly;
+		private String hasExcuse;
 
 		private String studentNumber;
 		private String hasDroppedScores;
@@ -114,11 +116,16 @@ public class GbGradebookData {
 				return new ReadOnlyScore(null);
 			} else {
 				final String grade = gradeInfo.getGrade();
+				final boolean excused = gradeInfo.isExcuse();
 
 				if (isUserAbleToEditAssessments || gradeInfo.isGradeable()) {
-					return new EditableScore(grade);
+				    EditableScore score = new EditableScore(grade);
+				    score.setExcused(excused);
+					return score;
 				} else {
-					return new ReadOnlyScore(grade);
+				    ReadOnlyScore score = new ReadOnlyScore(grade);
+				    score.setExcused(excused);
+					return score;
 				}
 			}
 		}
@@ -445,6 +452,7 @@ public class GbGradebookData {
 			studentDefinition.setLastName(student.getStudentLastName());
 			studentDefinition.setHasComments(formatColumnFlags(student, g -> StringUtils.isNotBlank(g.getGradeComment())));
 			studentDefinition.setHasDroppedScores(formatColumnFlags(student, g -> g.isDroppedFromCategoryScore()));
+			studentDefinition.setHasExcuse(formatExcuseData(student));
 
 			if (this.isStudentNumberVisible) {
 				studentDefinition.setStudentNumber(student.getStudentNumber());
@@ -576,6 +584,25 @@ public class GbGradebookData {
 		return sb.toString();
 	}
 
+	private String formatExcuseData(final GbStudentGradeInfo student){
+		final StringBuilder sb = new StringBuilder();
+
+		for(ColumnDefinition col : GbGradebookData.this.columns){
+			if(col instanceof AssignmentDefinition){
+				final AssignmentDefinition assignmentCol = (AssignmentDefinition) col;
+				final GbGradeInfo gradeInfo = student.getGrades().get(assignmentCol.getAssignmentId());
+				if(gradeInfo != null && gradeInfo.isExcuse()){
+					sb.append('1');
+				} else {
+					sb.append('0');
+				}
+			} else {
+				sb.append('0');
+			}
+		}
+		return sb.toString();
+	}
+
 	private String nullable(final Object value) {
 		if (value == null) {
 			return null;
@@ -594,6 +621,7 @@ public class GbGradebookData {
 
 	private abstract class Score {
 		private String score;
+		private boolean isExcused;
 
 		public Score(final String score) {
 			this.score = score;
@@ -613,7 +641,15 @@ public class GbGradebookData {
 		public boolean isLarge() {
 			return score != null && Double.valueOf(score) > 16384;
 		}
-	}
+
+        public boolean isExcused() {
+            return isExcused;
+        }
+
+        public void setExcused(boolean excused) {
+            isExcused = excused;
+        }
+    }
 
 	private class EditableScore extends Score {
 		public EditableScore(final String score) {

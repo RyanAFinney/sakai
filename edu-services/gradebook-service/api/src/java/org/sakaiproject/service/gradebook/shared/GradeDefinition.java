@@ -29,6 +29,7 @@ public class GradeDefinition {
 	private String gradeComment;
 	private int gradeEntryType;
 	private boolean gradeReleased;
+	private boolean excused;
 	
 	public String getStudentUid() {
 		return studentUid;
@@ -115,5 +116,14 @@ public class GradeDefinition {
 		this.gradeReleased = gradeReleased;
 	}
 	
-	
+	public void setExcused(boolean excuse){
+		this.excused = excuse;
+	}
+
+	/**
+	 * @return true if this grade is excused
+	 */
+	public boolean isExcused(){
+		return excused;
+	}
 }

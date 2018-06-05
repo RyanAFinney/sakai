@@ -1365,6 +1365,20 @@ public abstract class BaseHibernateManager extends HibernateDaoSupport {
         });
 	}
 
+	public boolean getAssignmentExcuse(final String gradebookUid, final Long assignmentId, final String studentUid) throws GradebookNotFoundException, AssessmentNotFoundException {
+        if(gradebookUid == null || assignmentId == null || studentUid == null){
+            throw new IllegalArgumentException("null parameter passed to getAssignmentScoreComment. Values are gradebookUid:" + gradebookUid + " assignmentId:" + assignmentId + " studentUid:"+ studentUid);
+        }
+        GradebookAssignment assignment = getAssignmentWithoutStats(gradebookUid, assignmentId);
+        AssignmentGradeRecord agr = getAssignmentGradeRecord(assignment, studentUid);
+
+        if(agr == null || agr.isExcludedFromGrade() == null){
+            return false;
+        }else{
+            return agr.isExcludedFromGrade().booleanValue();
+        }
+    }
+
 	public void updateGradeMapping(final Long gradeMappingId, final Map<String, Double> gradeMap){
 		getHibernateTemplate().execute((HibernateCallback<Void>) session -> {
             GradeMapping gradeMapping = (GradeMapping)session.load(GradeMapping.class, gradeMappingId);

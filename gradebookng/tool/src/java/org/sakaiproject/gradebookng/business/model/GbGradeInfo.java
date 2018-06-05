@@ -17,6 +17,7 @@ package org.sakaiproject.gradebookng.business.model;
 
 import java.io.Serializable;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.builder.CompareToBuilder;
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.sakaiproject.service.gradebook.shared.GradeDefinition;
@@ -39,6 +40,9 @@ public class GbGradeInfo implements Serializable, Comparable<GbGradeInfo> {
 
 	@Getter
 	private final String gradeComment;
+
+	@Getter
+	private final boolean excuse;
 
 	/**
 	 * Whether or not a user is able to grade this instance of the grade
@@ -65,11 +69,13 @@ public class GbGradeInfo implements Serializable, Comparable<GbGradeInfo> {
 		if (gd == null) {
 			this.grade = null;
 			this.gradeComment = null;
+			this.excuse = false;
 			this.gradeable = false;
 		} else {
 			this.grade = gd.getGrade();
 			this.gradeComment = gd.getGradeComment();
 			this.gradeable = false;
+			this.excuse = gd.isExcused();
 		}
 	}
 

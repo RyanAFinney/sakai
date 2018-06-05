@@ -47,24 +47,7 @@ import org.sakaiproject.component.cover.ServerConfigurationService;
 import org.sakaiproject.gradebookng.business.GbRole;
 import org.sakaiproject.gradebookng.business.model.GbGroup;
 import org.sakaiproject.gradebookng.business.util.GbStopWatch;
-import org.sakaiproject.gradebookng.tool.actions.DeleteAssignmentAction;
-import org.sakaiproject.gradebookng.tool.actions.EditAssignmentAction;
-import org.sakaiproject.gradebookng.tool.actions.EditCommentAction;
-import org.sakaiproject.gradebookng.tool.actions.EditSettingsAction;
-import org.sakaiproject.gradebookng.tool.actions.GradeUpdateAction;
-import org.sakaiproject.gradebookng.tool.actions.MoveAssignmentLeftAction;
-import org.sakaiproject.gradebookng.tool.actions.MoveAssignmentRightAction;
-import org.sakaiproject.gradebookng.tool.actions.OverrideCourseGradeAction;
-import org.sakaiproject.gradebookng.tool.actions.SetScoreForUngradedAction;
-import org.sakaiproject.gradebookng.tool.actions.SetStudentNameOrderAction;
-import org.sakaiproject.gradebookng.tool.actions.SetZeroScoreAction;
-import org.sakaiproject.gradebookng.tool.actions.ToggleCourseGradePoints;
-import org.sakaiproject.gradebookng.tool.actions.ViewAssignmentStatisticsAction;
-import org.sakaiproject.gradebookng.tool.actions.ViewCourseGradeLogAction;
-import org.sakaiproject.gradebookng.tool.actions.ViewCourseGradeStatisticsAction;
-import org.sakaiproject.gradebookng.tool.actions.ViewGradeLogAction;
-import org.sakaiproject.gradebookng.tool.actions.ViewRubricGradeAction;
-import org.sakaiproject.gradebookng.tool.actions.ViewGradeSummaryAction;
+import org.sakaiproject.gradebookng.tool.actions.*;
 import org.sakaiproject.gradebookng.tool.component.GbAjaxButton;
 import org.sakaiproject.gradebookng.tool.component.GbAjaxLink;
 import org.sakaiproject.gradebookng.tool.component.GbGradeTable;
@@ -293,7 +276,7 @@ public class GradebookPage extends BasePage {
 		this.gradeTable.addEventListener("moveAssignmentLeft", new MoveAssignmentLeftAction());
 		this.gradeTable.addEventListener("moveAssignmentRight", new MoveAssignmentRightAction());
 		this.gradeTable.addEventListener("viewCourseGradeStatistics", new ViewCourseGradeStatisticsAction());
-
+        this.gradeTable.addEventListener("excuseGrade", new ExcuseGradeAction());
 
 		tableArea.add(this.gradeTable);
 
