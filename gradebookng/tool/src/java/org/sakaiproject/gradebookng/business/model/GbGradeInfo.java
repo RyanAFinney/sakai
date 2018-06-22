@@ -17,7 +17,6 @@ package org.sakaiproject.gradebookng.business.model;
 
 import java.io.Serializable;
 
-import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.builder.CompareToBuilder;
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.sakaiproject.service.gradebook.shared.GradeDefinition;

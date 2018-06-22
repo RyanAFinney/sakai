@@ -29,9 +29,6 @@ public class ExcuseGradeAction extends InjectableAction implements Serializable 
     @SpringBean(name = "org.sakaiproject.gradebookng.business.GradebookNgBusinessService")
     private GradebookNgBusinessService businessService;
 
-    public ExcuseGradeAction(){
-    }
-
     private class ExcuseGradeResponse implements ActionResponse {
         private String courseGrade;
         private String points;
@@ -139,7 +136,6 @@ public class ExcuseGradeAction extends InjectableAction implements Serializable 
 
         Optional<CategoryScoreData> catData = categoryId == null ?
                 Optional.empty() : businessService.getCategoryScoreForStudent(Long.valueOf(categoryId), studentUuid);
-        String catScore = catData.map(c -> String.valueOf(c.score)).orElse ("-");
         List<Long> droppedItems = catData.map(c -> c.droppedItems).orElse(Collections.emptyList());
         target.add(page.updateLiveGradingMessage(page.getString("feedback.saved")));
 

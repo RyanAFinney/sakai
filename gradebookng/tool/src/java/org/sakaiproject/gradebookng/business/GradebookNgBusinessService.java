@@ -1194,10 +1194,8 @@ public class GradebookNgBusinessService {
 					final Map<Long, String> gradeMap = new HashMap<>();
 					for (final Long assignmentId : categoryAssignmentIds) {
 						final GbGradeInfo gradeInfo = grades.get(assignmentId);
-						if (gradeInfo != null) {
-							if(!gradeInfo.isExcuse()) {
+						if (gradeInfo != null && !gradeInfo.isExcuse()) {
 								gradeMap.put(assignmentId, gradeInfo.getGrade());
-							}
 						}
 					}
 
@@ -2160,7 +2158,7 @@ public class GradebookNgBusinessService {
 
 		try{
 			final boolean excuse = this.gradebookService.getAssignmentExcuse(gradebook.getUid(), assignmentId, studentUuid);
-			if(excuse == true){
+			if(excuse){
 				return "1";
 			}else{
 				return "0";

@@ -2163,12 +2163,9 @@ public class GradebookServiceHibernateImpl extends BaseHibernateManager implemen
           gradeDef.setExcused(false);
       }else {
           gradeDef.setExcused(record.isExcludedFromGrade());
-
       }
-
 	  saveGradesAndComments(gradebookUid, gradableObjectId, gradeDefList);
   }
-
 
   @Override
   public void saveGradeAndExcuseForStudent(String gradebookUid, Long gradableObjectId, String studentUid, String grade, boolean excuse) {
@@ -2313,8 +2310,7 @@ public class GradebookServiceHibernateImpl extends BaseHibernateManager implemen
 				  }
 			  } else {
 				  // if the grade is something other than null, add a new AGR
-				  if (StringUtils.isNotBlank(newGrade)) {
-					  if (gradeDef.getGrade() != null && !gradeDef.getGrade().trim().equals("") || excuse != currentExcuse) {
+				  if (StringUtils.isNotBlank(newGrade) && (gradeDef.getGrade() != null && !gradeDef.getGrade().trim().equals("") || excuse != currentExcuse)) {
 						  gradeRec = new AssignmentGradeRecord(assignment, studentId, convertedGrade);
 						  gradeRec.setGraderId(graderUid);
 						  gradeRec.setDateRecorded(gradedDate);
@@ -2324,7 +2320,6 @@ public class GradebookServiceHibernateImpl extends BaseHibernateManager implemen
 						  // Add a GradingEvent, which stores the actual input grade rather than the converted one
 						  final GradingEvent event = new GradingEvent(assignment, graderId, studentId, newGrade);
 						  eventsToAdd.add(event);
-					  }
 				  }
 			  }
 			  // Determine if the Comment needs to be updated
