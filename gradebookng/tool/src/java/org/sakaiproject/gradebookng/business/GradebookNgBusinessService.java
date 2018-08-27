@@ -15,10 +15,6 @@
  */
 package org.sakaiproject.gradebookng.business;
 
-import java.math.RoundingMode;
-import java.security.Permission;
-import java.text.Format;
-import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -46,7 +42,6 @@ import org.sakaiproject.authz.api.SecurityAdvisor;
 import org.sakaiproject.authz.api.SecurityAdvisor.SecurityAdvice;
 import org.sakaiproject.authz.api.SecurityService;
 import org.sakaiproject.component.cover.ComponentManager;
-import org.sakaiproject.coursemanagement.api.Membership;
 import org.sakaiproject.section.api.coursemanagement.CourseSection;
 import org.sakaiproject.section.api.facade.Role;
 import org.sakaiproject.exception.IdUnusedException;
@@ -322,9 +317,10 @@ public class GradebookNgBusinessService {
 	{
 		final List<GbUser> gbUsers = new ArrayList<>(userUuids.size());
 		final List<User> users = getUsers(userUuids);
+		final Site site = getCurrentSite().orElse(null);
 
 		for (final User u : users) {
-			gbUsers.add(new GbUser(u));
+			gbUsers.add(new GbUser(u, getStudentNumber(u, site)));
 		}
 
 		return gbUsers;
@@ -824,8 +820,6 @@ public class GradebookNgBusinessService {
 
 		// save
 		try {
-			// note, you must pass in the comment or it will be nulled out by the GB service
-			// also, must pass in the raw grade as the service does conversions between percentage etc
 			this.gradebookService.saveGradeAndExcuseForStudent(gradebook.getUid(), assignmentId, studentUuid,
 					storedGrade, excuse);
 
@@ -1194,7 +1188,7 @@ public class GradebookNgBusinessService {
 					final Map<Long, String> gradeMap = new HashMap<>();
 					for (final Long assignmentId : categoryAssignmentIds) {
 						final GbGradeInfo gradeInfo = grades.get(assignmentId);
-						if (gradeInfo != null && !gradeInfo.isExcuse()) {
+						if (gradeInfo != null && !gradeInfo.isExcused()) {
 								gradeMap.put(assignmentId, gradeInfo.getGrade());
 						}
 					}
@@ -2157,7 +2151,7 @@ public class GradebookNgBusinessService {
 		final Gradebook gradebook = getGradebook(siteId);
 
 		try{
-			final boolean excuse = this.gradebookService.getAssignmentExcuse(gradebook.getUid(), assignmentId, studentUuid);
+			final boolean excuse = this.gradebookService.getIsAssignmentExcused(gradebook.getUid(), assignmentId, studentUuid);
 			if(excuse){
 				return "1";
 			}else{

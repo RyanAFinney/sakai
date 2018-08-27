@@ -3671,10 +3671,10 @@ public abstract class BaseSiteService implements SiteService, Observer
 	 * regenerate that user's cache since the assumption is generally that the user would have
 	 * clicked a site link presented to them before their access was revoked.
 	 *
-	 * @param _ The Observable, which is effectively nothing with ETS
+	 * @param o The Observable, which is effectively nothing with ETS
 	 * @param eventObj The event from ETS; will be checked and no-op if null or not an Event
 	 */
-	public void update(Observable _, Object eventObj) {
+	public void update(Observable o, Object eventObj) {
 		if (eventObj == null || !(eventObj instanceof Event))
 		{
 			return;
@@ -3805,6 +3805,24 @@ public abstract class BaseSiteService implements SiteService, Observer
 			
 			NotificationAction action = notification.getAction();
 			action.notify(notification, event);
+		}
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public SiteTitleValidationStatus validateSiteTitle(String orig, String stripped) {
+		orig = StringUtils.trimToEmpty(orig);
+		stripped = StringUtils.trimToEmpty(stripped);
+
+		if (!orig.equals(stripped) && StringUtils.isBlank(stripped)) {
+			return SiteTitleValidationStatus.STRIPPED_TO_EMPTY;
+		} else if (StringUtils.isBlank(stripped)) {
+			return SiteTitleValidationStatus.EMPTY;
+		} else if (stripped.length() > SITE_TITLE_MAX_LENGTH) {
+			return SiteTitleValidationStatus.TOO_LONG;
+		} else {
+			return SiteTitleValidationStatus.OK;
 		}
 	}
 }

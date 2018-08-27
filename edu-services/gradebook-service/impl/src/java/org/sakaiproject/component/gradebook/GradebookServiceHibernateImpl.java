@@ -39,6 +39,7 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 
@@ -48,7 +49,6 @@ import org.hibernate.Query;
 import org.hibernate.Session;
 import org.hibernate.StaleObjectStateException;
 import org.hibernate.criterion.Restrictions;
-
 import org.sakaiproject.authz.cover.SecurityService;
 import org.sakaiproject.component.cover.ServerConfigurationService;
 import org.sakaiproject.hibernate.HibernateCriterionUtils;
@@ -94,6 +94,8 @@ import org.sakaiproject.util.ResourceLoader;
 
 import org.springframework.orm.hibernate4.HibernateCallback;
 import org.springframework.orm.hibernate4.HibernateOptimisticLockingFailureException;
+
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * A Hibernate implementation of GradebookService.
@@ -329,11 +331,7 @@ public class GradebookServiceHibernateImpl extends BaseHibernateManager implemen
 						gradeDef.setGraderUid(gradeRecord.getGraderId());
 						gradeDef.setGradeComment(commentText);
 
-						if(gradeRecord.isExcludedFromGrade() == null){
-						    gradeDef.setExcused(false);
-                        }else{
-						    gradeDef.setExcused(gradeRecord.isExcludedFromGrade());
-                        }
+						gradeDef.setExcused(gradeRecord.isExcludedFromGrade());
 
 						if (gradebook.getGrade_type() == GradebookService.GRADE_TYPE_LETTER) {
 							final List<AssignmentGradeRecord> gradeList = new ArrayList<>();
@@ -363,24 +361,6 @@ public class GradebookServiceHibernateImpl extends BaseHibernateManager implemen
 			log.debug("returning grade def for " + studentUid);
 		}
 		return gradeDef;
-	}
-
-	@Override
-	public String getGradebookDefinitionXml(final String gradebookUid) {
-		final Long gradebookId = getGradebook(gradebookUid).getId();
-		final Gradebook gradebook = getGradebook(gradebookUid);
-
-		final GradebookDefinition gradebookDefinition = new GradebookDefinition();
-		final GradeMapping selectedGradeMapping = gradebook.getSelectedGradeMapping();
-		gradebookDefinition.setSelectedGradingScaleUid(selectedGradeMapping.getGradingScale().getUid());
-		gradebookDefinition.setSelectedGradingScaleBottomPercents(new HashMap<>(selectedGradeMapping.getGradeMap()));
-		gradebookDefinition.setAssignments(getAssignments(gradebookUid));
-
-		gradebookDefinition.setGradeType(gradebook.getGrade_type());
-		gradebookDefinition.setCategoryType(gradebook.getCategory_type());
-		gradebookDefinition.setCategory(getCategories(gradebookId));
-
-		return VersionedExternalizable.toXml(gradebookDefinition);
 	}
 
 	@Override
@@ -435,157 +415,7 @@ public class GradebookServiceHibernateImpl extends BaseHibernateManager implemen
 		return rval;
 	}
 
-	@SuppressWarnings("rawtypes")
-	@Override
-	@Deprecated
-	public void transferGradebookDefinitionXml(final String fromGradebookUid, final String toGradebookUid, final String fromGradebookXml) {
-		final Gradebook gradebook = getGradebook(toGradebookUid);
-		final Gradebook fromGradebook = getGradebook(fromGradebookUid);
 
-		final GradebookDefinition gradebookDefinition = (GradebookDefinition)VersionedExternalizable.fromXml(fromGradebookXml);
-
-		gradebook.setCategory_type(gradebookDefinition.getCategoryType());
-		gradebook.setGrade_type(gradebookDefinition.getGradeType());
-
-		updateGradebook(gradebook);
-
-		final List category = getCategories(fromGradebook.getId());
-
-		int assignmentsAddedCount = 0;
-		Long catId = null;
-		int undefined_nb = 0;
-
-		final List catList = gradebookDefinition.getCategory();
-		final List<Category> catList_tempt = new ArrayList<>();
-
-		if(!category.isEmpty()) {
-			//deal with category with assignments
-			for(final Iterator iter = category.iterator(); iter.hasNext();) {
-
-				int categoryCount = 0;
-				final String catName = ((Category)iter.next()).getName();
-
-				for (final org.sakaiproject.service.gradebook.shared.Assignment obj : gradebookDefinition.getAssignments()) {
-					final org.sakaiproject.service.gradebook.shared.Assignment assignmentDef = obj;
-
-					boolean newCategory = false;
-					// Externally managed assessments should not be included.
-					if (assignmentDef.isExternallyMaintained()) {
-						continue;
-					}
-
-					if(catName.equals(assignmentDef.getCategoryName())) {
-						newCategory = true;
-						categoryCount++;
-					}
-
-					if (assignmentDef.getCategoryName() != null) {
-						if(!newCategory) {}
-						else if(newCategory && categoryCount == 1) {
-							catId = createCategory(gradebook.getId(), assignmentDef.getCategoryName(), assignmentDef.getWeight(), 0, 0, 0, assignmentDef.isCategoryExtraCredit());
-							final Category catTempt = getCategory(catId);
-
-							catList_tempt.add(catTempt);
-							createAssignmentForCategory(gradebook.getId(), catId, assignmentDef.getName(), assignmentDef.getPoints(), assignmentDef.getDueDate(), true, false, assignmentDef.isExtraCredit());
-							assignmentsAddedCount++;
-						}
-						else{
-							createAssignmentForCategory(gradebook.getId(), catId, assignmentDef.getName(), assignmentDef.getPoints(), assignmentDef.getDueDate(), true, false, assignmentDef.isExtraCredit());
-							assignmentsAddedCount++;
-						}
-
-					}
-					//deal with assignments in undefined.
-					else {
-						if (undefined_nb == 0) {
-							createAssignment(gradebook.getId(), assignmentDef.getName(), assignmentDef.getPoints(), assignmentDef.getDueDate(), true, false, assignmentDef.isExtraCredit());
-							assignmentsAddedCount++;
-
-						}
-					}
-				}
-				undefined_nb++;
-			}
-
-			//deal with Category without assignments inside
-			final Iterator it_tempt = catList_tempt.iterator();
-			Iterator it = catList.iterator();
-
-			Category cat_cat ;
-			Category cat_tempt;
-
-			while(it_tempt.hasNext()) {
-				cat_tempt = (Category) it_tempt.next();
-				while(it.hasNext()) {
-					cat_cat = (Category) it.next();
-					if(cat_tempt.getName().equals(cat_cat.getName())) {
-						it.remove();
-						it = catList.iterator();
-					}
-				}
-				it = catList.iterator();
-			}
-
-			final Iterator itUpdate = catList.iterator();
-			while(itUpdate.hasNext()){
-				final Category catObj = (Category)itUpdate.next();
-				createCategory(gradebook.getId(), catObj.getName(), catObj.getWeight(), catObj.getDropLowest(), catObj.getDropHighest(), catObj.getKeepHighest(), catObj.isExtraCredit());
-			}
-		}
-		//deal with no categories
-		else {
-			for (final org.sakaiproject.service.gradebook.shared.Assignment obj : gradebookDefinition.getAssignments()) {
-				final org.sakaiproject.service.gradebook.shared.Assignment assignmentDef = obj;
-
-				// Externally managed assessments should not be included.
-				if (assignmentDef.isExternallyMaintained()) {
-					continue;
-				}
-
-				// All assignments should be unreleased even if they were released in the original.
-
-				createAssignment(gradebook.getId(), assignmentDef.getName(), assignmentDef.getPoints(), assignmentDef.getDueDate(), true, false, assignmentDef.isExtraCredit());
-				assignmentsAddedCount++;
-			}
-
-		}
-
-		if (log.isInfoEnabled()) {
-			log.info("Merge to gradebook " + toGradebookUid + " added " + assignmentsAddedCount + " assignments");
-		}
-
-			// Carry over the old gradebook's selected grading scheme if possible.
-		final String fromGradingScaleUid = gradebookDefinition.getSelectedGradingScaleUid();
-		MERGE_GRADE_MAPPING: if (!StringUtils.isEmpty(fromGradingScaleUid)) {
-		for (final GradeMapping gradeMapping : gradebook.getGradeMappings()) {
-				if (gradeMapping.getGradingScale().getUid().equals(fromGradingScaleUid)) {
-					// We have a match. Now make sure that the grades are as expected.
-					final Map<String, Double> inputGradePercents = gradebookDefinition.getSelectedGradingScaleBottomPercents();
-					final Set<String> gradeCodes = inputGradePercents.keySet();
-					if (gradeCodes.containsAll(gradeMapping.getGradeMap().keySet())) {
-						// Modify the existing grade-to-percentage map.
-						for (final String gradeCode : gradeCodes) {
-							gradeMapping.getGradeMap().put(gradeCode, inputGradePercents.get(gradeCode));
-						}
-						gradebook.setSelectedGradeMapping(gradeMapping);
-						updateGradebook(gradebook);
-						if (log.isInfoEnabled()) {
-							log.info("Merge to gradebook " + toGradebookUid + " updated grade mapping");
-						}
-					} else {
-						if (log.isInfoEnabled()) {
-							log.info("Merge to gradebook " + toGradebookUid + " skipped grade mapping change because the " + fromGradingScaleUid + " grade codes did not match");
-						}
-					}
-					break MERGE_GRADE_MAPPING;
-				}
-			}
-			// Did not find a matching grading scale.
-			if (log.isInfoEnabled()) {
-				log.info("Merge to gradebook " + toGradebookUid + " skipped grade mapping change because grading scale " + fromGradingScaleUid + " is not defined");
-			}
-		}
-	}
 
 	@Override
 	public void transferGradebook(final GradebookInformation gradebookInformation, final List<org.sakaiproject.service.gradebook.shared.Assignment> assignments, final String toGradebookUid) {
@@ -680,8 +510,8 @@ public class GradebookServiceHibernateImpl extends BaseHibernateManager implemen
 		// Carry over the old gradebook's selected grading scheme if possible.
 		final String fromGradingScaleUid = gradebookInformation.getSelectedGradingScaleUid();
 
-		MERGE_GRADE_MAPPING: if (!StringUtils.isEmpty(fromGradingScaleUid)) {
-		for (final GradeMapping gradeMapping : gradebook.getGradeMappings()) {
+		if (!StringUtils.isEmpty(fromGradingScaleUid)) {
+			for (final GradeMapping gradeMapping : gradebook.getGradeMappings()) {
 				if (gradeMapping.getGradingScale().getUid().equals(fromGradingScaleUid)) {
 					// We have a match. Now make sure that the grades are as expected.
 					final Map<String, Double> inputGradePercents = gradebookInformation.getSelectedGradingScaleBottomPercents();
@@ -697,84 +527,14 @@ public class GradebookServiceHibernateImpl extends BaseHibernateManager implemen
 					} else {
 						log.info("Merge to gradebook {} skipped grade mapping change because the {} grade codes did not match", toGradebookUid, fromGradingScaleUid);
 					}
-					break MERGE_GRADE_MAPPING;
+					break;
 				}
 			}
 			// Did not find a matching grading scale.
 			log.info("Merge to gradebook {} skipped grade mapping change because grading scale {} is not defined", toGradebookUid, fromGradingScaleUid);
 		}
-
-
 	}
 
-	@Override
-	public void mergeGradebookDefinitionXml(final String toGradebookUid, final String fromGradebookXml) {
-		final Gradebook gradebook = getGradebook(toGradebookUid);
-		final GradebookDefinition gradebookDefinition = (GradebookDefinition)VersionedExternalizable.fromXml(fromGradebookXml);
-
-		final List<String> assignmentNames = getHibernateTemplate().execute(session -> session
-				.createQuery("select asn.name from GradebookAssignment as asn where asn.gradebook.id = :gradebookid and asn.removed is false")
-				.setLong("gradebookid", gradebook.getId())
-				.list());
-
-		// Add any non-externally-managed assignments with non-duplicate names.
-		int assignmentsAddedCount = 0;
-		for (final org.sakaiproject.service.gradebook.shared.Assignment obj : gradebookDefinition.getAssignments()) {
-			final org.sakaiproject.service.gradebook.shared.Assignment assignmentDef = obj;
-
-			// Externally managed assessments should not be included.
-			if (assignmentDef.isExternallyMaintained()) {
-				continue;
-			}
-
-			// Skip any input assignments with duplicate names.
-			if (assignmentNames.contains(assignmentDef.getName())) {
-				if (log.isInfoEnabled()) {
-					log.info("Merge to gradebook " + toGradebookUid + " skipped duplicate assignment named " + assignmentDef.getName());
-				}
-				continue;
-			}
-
-			// All assignments should be unreleased even if they were released in the original.
-			createAssignment(gradebook.getId(), assignmentDef.getName(), assignmentDef.getPoints(), assignmentDef.getDueDate(), true, false, assignmentDef.isExtraCredit());
-			assignmentsAddedCount++;
-		}
-		if (log.isInfoEnabled()) {
-			log.info("Merge to gradebook " + toGradebookUid + " added " + assignmentsAddedCount + " assignments");
-		}
-
-		// Carry over the old gradebook's selected grading scheme if possible.
-		final String fromGradingScaleUid = gradebookDefinition.getSelectedGradingScaleUid();
-		MERGE_GRADE_MAPPING: if (!StringUtils.isEmpty(fromGradingScaleUid)) {
-			for (final GradeMapping gradeMapping : gradebook.getGradeMappings()) {
-				if (gradeMapping.getGradingScale().getUid().equals(fromGradingScaleUid)) {
-					// We have a match. Now make sure that the grades are as expected.
-					final Map<String, Double> inputGradePercents = gradebookDefinition.getSelectedGradingScaleBottomPercents();
-					final Set<String> gradeCodes = inputGradePercents.keySet();
-					if (gradeCodes.containsAll(gradeMapping.getGradeMap().keySet())) {
-						// Modify the existing grade-to-percentage map.
-						for (final String gradeCode : gradeCodes) {
-							gradeMapping.getGradeMap().put(gradeCode, inputGradePercents.get(gradeCode));
-						}
-						gradebook.setSelectedGradeMapping(gradeMapping);
-						updateGradebook(gradebook);
-						if (log.isInfoEnabled()) {
-							log.info("Merge to gradebook " + toGradebookUid + " updated grade mapping");
-						}
-					} else {
-						if (log.isInfoEnabled()) {
-							log.info("Merge to gradebook " + toGradebookUid + " skipped grade mapping change because the " + fromGradingScaleUid + " grade codes did not match");
-						}
-					}
-					break MERGE_GRADE_MAPPING;
-				}
-			}
-			// Did not find a matching grading scale.
-			if (log.isInfoEnabled()) {
-				log.info("Merge to gradebook " + toGradebookUid + " skipped grade mapping change because grading scale " + fromGradingScaleUid + " is not defined");
-			}
-		}
-	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
@@ -1106,17 +866,12 @@ public class GradebookServiceHibernateImpl extends BaseHibernateManager implemen
 					extraCredit = true;
 				}
 
-                boolean excused;
-                if(gradeRec.isExcludedFromGrade() == null){
-                    excused = false;
-                }else{
-                    excused = gradeRec.isExcludedFromGrade();
-                }
-                if (assign.isCounted() && !assign.getUngraded() && !assign.isRemoved() && countedSet.contains(assign) &&
-                        assign.getPointsPossible() != null && assign.getPointsPossible() > 0 && !gradeRec.getDroppedFromGrade() && !extraCredit && !excused) {
-                    countedGradeRecs.add(gradeRec);
-                }
-            }
+				boolean excused = BooleanUtils.toBoolean(gradeRec.isExcludedFromGrade());
+				if (assign.isCounted() && !assign.getUngraded() && !assign.isRemoved() && countedSet.contains(assign) &&
+					assign.getPointsPossible() != null && assign.getPointsPossible() > 0 && !gradeRec.getDroppedFromGrade() && !extraCredit && !excused) {
+					countedGradeRecs.add(gradeRec);
+				}
+			}
 
             final Set assignmentsTaken = new HashSet();
             final Set categoryTaken = new HashSet();
@@ -1233,12 +988,7 @@ public class GradebookServiceHibernateImpl extends BaseHibernateManager implemen
 	    final Set assignmentsTaken = new HashSet();
 	    for (final AssignmentGradeRecord gradeRec : gradeRecs)
 	    {
-            boolean excused;
-            if(gradeRec.isExcludedFromGrade() == null){
-                excused = false;
-            } else {
-                excused = gradeRec.isExcludedFromGrade();
-            }
+            boolean excused = BooleanUtils.toBoolean(gradeRec.isExcludedFromGrade());
 
 	        if(gradeRec.getPointsEarned() != null && !gradeRec.getPointsEarned().equals("") && !gradeRec.getDroppedFromGrade())
 	        {
@@ -1987,11 +1737,7 @@ public class GradebookServiceHibernateImpl extends BaseHibernateManager implemen
 			gradeDef.setGradeComment(commentText);
 		}
 
-		if(gradeRecord.isExcludedFromGrade() == null){
-			gradeDef.setExcused(false);
-		} else {
-			gradeDef.setExcused(gradeRecord.isExcludedFromGrade());
-		}
+		gradeDef.setExcused(gradeRecord.isExcludedFromGrade());
 
 		return gradeDef;
 	}
@@ -2159,12 +1905,12 @@ public class GradebookServiceHibernateImpl extends BaseHibernateManager implemen
 
       AssignmentGradeRecord record = getAssignmentGradeRecord(assignment, studentUid);
 
-      if(record.isExcludedFromGrade() == null){
-          gradeDef.setExcused(false);
-      }else {
-          gradeDef.setExcused(record.isExcludedFromGrade());
+      if(record != null) {
+      	  gradeDef.setExcused(BooleanUtils.toBoolean(record.isExcludedFromGrade()));
+      } else {
+      	  gradeDef.setExcused(false);
       }
-	  saveGradesAndComments(gradebookUid, gradableObjectId, gradeDefList);
+      saveGradesAndComments(gradebookUid, gradableObjectId, gradeDefList);
   }
 
   @Override
@@ -2178,7 +1924,7 @@ public class GradebookServiceHibernateImpl extends BaseHibernateManager implemen
 		gradeDef.setGrade(grade);
 		gradeDef.setExcused(excuse);
 
-		List<GradeDefinition> gradeDefList = new ArrayList<GradeDefinition>();
+		List<GradeDefinition> gradeDefList = new ArrayList<>();
 		gradeDefList.add(gradeDef);
 
 		saveGradesAndComments(gradebookUid, gradableObjectId, gradeDefList);
@@ -2285,10 +2031,10 @@ public class GradebookServiceHibernateImpl extends BaseHibernateManager implemen
 			  Double convertedGrade = convertInputGradeToPoints(gradebook.getGrade_type(), mapping, assignment.getPointsPossible(), newGrade);
 			  AssignmentGradeRecord gradeRec = studentIdGradeRecordMap.get(studentId);
 			  boolean currentExcuse;
-			  if (gradeRec == null || gradeRec.isExcludedFromGrade() == null) {
+			  if (gradeRec == null) {
 				  currentExcuse = false;
 			  } else {
-				  currentExcuse = gradeRec.isExcludedFromGrade();
+				  currentExcuse = BooleanUtils.toBoolean(gradeRec.isExcludedFromGrade());
 			  }
 
 			  if (gradeRec != null) {
@@ -2310,7 +2056,7 @@ public class GradebookServiceHibernateImpl extends BaseHibernateManager implemen
 				  }
 			  } else {
 				  // if the grade is something other than null, add a new AGR
-				  if (StringUtils.isNotBlank(newGrade) && (gradeDef.getGrade() != null && !gradeDef.getGrade().trim().equals("") || excuse != currentExcuse)) {
+				  if (StringUtils.isNotBlank(newGrade) && (StringUtils.isNotBlank(gradeDef.getGrade()) || excuse != currentExcuse)) {
 						  gradeRec = new AssignmentGradeRecord(assignment, studentId, convertedGrade);
 						  gradeRec.setGraderId(graderUid);
 						  gradeRec.setDateRecorded(gradedDate);
@@ -2599,24 +2345,23 @@ public class GradebookServiceHibernateImpl extends BaseHibernateManager implemen
 	@Override
 	public String getAssignmentScoreStringByNameOrId(final String gradebookUid, final String assignmentName, final String studentUid)
 			throws GradebookNotFoundException, AssessmentNotFoundException {
-		// TODO Auto-generated method stub
-		String assignment = null;
+		String score = null;
 		try {
-			assignment = getAssignmentScoreString(gradebookUid, assignmentName, studentUid);
+			score = getAssignmentScoreString(gradebookUid, assignmentName, studentUid);
 		}
 		catch (final AssessmentNotFoundException e) {
 			//Don't fail on this exception
 			log.debug("Assessment not found by name", e);
 		}
 
-		if (assignment == null) {
+		if (score == null) {
 			//Try to get the assignment by id
 			if (NumberUtils.isCreatable(assignmentName)) {
 				final Long assignmentId = NumberUtils.toLong(assignmentName, -1L);
-				return getAssignmentScoreString(gradebookUid, assignmentId, studentUid);
+				score = getAssignmentScoreString(gradebookUid, assignmentId, studentUid);
 			}
 		}
-		return null;
+		return score;
 	}
 
   	@Override
@@ -2922,13 +2667,7 @@ public class GradebookServiceHibernateImpl extends BaseHibernateManager implemen
                     final List<AssignmentGradeRecord> gradeRecordsByCatAndStudent = gradeRecordMap.get(studentId + cat.getId());
                     if(gradeRecordsByCatAndStudent != null) {
                         for(AssignmentGradeRecord agr : gradeRecordsByCatAndStudent){
-                            boolean excluded;
-                            if(agr.isExcludedFromGrade() == null){
-                                excluded = false;
-                            }else{
-                                excluded = agr.isExcludedFromGrade();
-                            }
-                            if(!excluded){
+                            if(!BooleanUtils.toBoolean(agr.isExcludedFromGrade())){
                                 gradesByCategory.add(agr);
                             }
                         }
@@ -3065,9 +2804,8 @@ public class GradebookServiceHibernateImpl extends BaseHibernateManager implemen
 	 * @return
 	 */
 	private void postUpdateGradeEvent(final String gradebookUid, final String assignmentName, final String studentUid, final Double pointsEarned) {
-	    if (this.eventTrackingService != null) {
-            this.eventTrackingService.postEvent("gradebook.updateItemScore","/gradebook/"+gradebookUid+"/"+assignmentName+"/"+studentUid+"/"+pointsEarned+"/student");
-        }
+		postEvent("gradebook.updateItemScore",
+				"/gradebook/" + gradebookUid + "/" + assignmentName + "/" + studentUid + "/" + pointsEarned + "/student");
     }
 
 	/**
@@ -3352,12 +3090,7 @@ public class GradebookServiceHibernateImpl extends BaseHibernateManager implemen
 				return true;
 			}
 
-			boolean excluded;
-			if(gradeRecord.isExcludedFromGrade() == null){
-				excluded = false;
-			} else {
-				excluded = gradeRecord.isExcludedFromGrade();
-			}
+			boolean excluded = BooleanUtils.toBoolean(gradeRecord.isExcludedFromGrade());
 			//remove if the assignment/graderecord doesn't meet the criteria for the calculation (rule 2-6)
 			if(excluded || assignment.getPointsPossible() == null || gradeRecord.getPointsEarned() == null || !assignment.isCounted() || !assignment.isReleased() || gradeRecord.getDroppedFromGrade()) {
 				return true;
@@ -3531,7 +3264,7 @@ public class GradebookServiceHibernateImpl extends BaseHibernateManager implemen
 		});
 
 		//set grade type, but only if sakai.property is true OR user is admin
-		boolean gradeTypeAvailForNonAdmins = ServerConfigurationService.getBoolean("gradebook.settings.gradeEntry.showToNonAdmins", true);
+		final boolean gradeTypeAvailForNonAdmins = ServerConfigurationService.getBoolean("gradebook.settings.gradeEntry.showToNonAdmins", true);
 		if(gradeTypeAvailForNonAdmins || SecurityService.isSuperUser()) {
 			gradebook.setGrade_type(gbInfo.getGradeType());
 		}

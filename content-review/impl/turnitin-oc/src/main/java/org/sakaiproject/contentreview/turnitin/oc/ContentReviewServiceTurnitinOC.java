@@ -147,6 +147,9 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	private static final String ALL_SOURCES = "all_sources";
 	private static final String MODES = "modes";
 	private static final String SIMILARITY = "similarity";
+	private static final String VIEWER_DEFAULT_PERMISSIONS = "viewer_default_permissions_set";
+	private static final String INSTRUCTOR = "INSTRUCTOR";
+	private static final String LEARNER = "LEARNER";
 	
 	private static final String GENERATE_REPORTS_IMMEDIATELY_AND_ON_DUE_DATE= "1";
 	private static final String GENERATE_REPORTS_ON_DUE_DATE = "2";	
@@ -175,7 +178,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	//Caches requests for instructors so that we don't have to send a request for every student
 	private Cache EULA_CACHE;
 	private static final String EULA_LATEST_KEY = "latest";
-	private static final String EULA_DEFAULT_LOCALE = "en-EN";
+	private static final String EULA_DEFAULT_LOCALE = "en-US";
 	
 	
 	// Define Turnitin's acceptable file extensions and MIME types, order of these arrays DOES matter
@@ -276,29 +279,31 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		CONTENT_UPLOAD_HEADERS.putAll(BASE_HEADERS);
 		CONTENT_UPLOAD_HEADERS.put(HEADER_CONTENT, CONTENT_TYPE_BINARY);
 
-		try {
-			// Get the webhook url
-			String webhookUrl = getWebhookUrl(Optional.empty());
-			boolean webhooksSetup = false;
-			// Check to see if any webhooks have already been set up for this url
-			for (Webhook webhook : getWebhooks()) {
-				log.info("Found webhook: " + webhook.getUrl());
-				if (StringUtils.isNotEmpty(webhook.getUrl()) && webhook.getUrl().equals(webhookUrl)) {
-					webhooksSetup = true;
-					break;
+		if(StringUtils.isNotEmpty(apiKey) && StringUtils.isNotEmpty(serviceUrl)) {
+			try {
+				// Get the webhook url
+				String webhookUrl = getWebhookUrl(Optional.empty());
+				boolean webhooksSetup = false;
+				// Check to see if any webhooks have already been set up for this url
+				for (Webhook webhook : getWebhooks()) {
+					log.info("Found webhook: " + webhook.getUrl());
+					if (StringUtils.isNotEmpty(webhook.getUrl()) && webhook.getUrl().equals(webhookUrl)) {
+						webhooksSetup = true;
+						break;
+					}
 				}
-			}
 
-			if (!webhooksSetup) {
-				// No webhook set up for this url, set one up
-				log.info("No matching webhook for " + webhookUrl);
-				String id = setupWebhook(webhookUrl);
-				if(StringUtils.isNotEmpty(id)) {
-					log.info("successfully created webhook: " + id);
+				if (!webhooksSetup) {
+					// No webhook set up for this url, set one up
+					log.info("No matching webhook for " + webhookUrl);
+					String id = setupWebhook(webhookUrl);
+					if(StringUtils.isNotEmpty(id)) {
+						log.info("successfully created webhook: " + id);
+					}
 				}
+			} catch (Exception e) {
+				log.error(e.getLocalizedMessage(), e);
 			}
-		} catch (Exception e) {
-			log.error(e.getLocalizedMessage(), e);
 		}
 	}
 
@@ -481,6 +486,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 				modes.put(ALL_SOURCES, Boolean.TRUE);
 				similarity.put(MODES, modes);
 				data.put(SIMILARITY, similarity);
+				data.put(VIEWER_DEFAULT_PERMISSIONS, isInstructor ? INSTRUCTOR : LEARNER);
 
 				// Check user preference for locale			
 				// If user has no preference set - get the system default
@@ -1465,33 +1471,49 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		// If user has no preference set - get the system default
 		Locale locale = Optional.ofNullable(preferencesService.getLocale(userId))
 				.orElse(Locale.getDefault());
-		//find available EULA langauges:
-		Map<String, Object> eula = getLatestEula();
-		if(eula != null && eula.containsKey("available_languages") && eula.get("available_languages") instanceof List) {
-			for(String eula_locale : (List<String>) eula.get("available_languages")) {
-				if(locale.getLanguage().equalsIgnoreCase(eula_locale)) {
-					//found exact match
-					userLocale = eula_locale;
-					break;
-				}
+		if(locale != null && StringUtils.isNotEmpty(locale.getCountry())) {
+			StringBuilder sb = new StringBuilder();
+			sb.append(locale.getLanguage());
+			if(StringUtils.isNotEmpty(locale.getCountry())) {
+				sb.append("-" + locale.getCountry());
 			}
-			//if we do not find the exact match, find a match based on the first part
-			if(locale.getLanguage().length() >= 2) {
-				String userLanguage = locale.getLanguage().substring(0, 2);
+			userLocale = sb.toString();
+		}
+		//find available EULA langauges:
+		boolean found = false;
+		if(StringUtils.isNotEmpty(userLocale)) {
+			Map<String, Object> eula = getLatestEula();
+			if(eula != null && eula.containsKey("available_languages") && eula.get("available_languages") instanceof List) {
+
 				for(String eula_locale : (List<String>) eula.get("available_languages")) {
-					if(eula_locale.toLowerCase().startsWith(userLanguage.toLowerCase())) {					
-						//found language match
+					if(userLocale.equalsIgnoreCase(eula_locale)) {
+						//found exact match
 						userLocale = eula_locale;
+						found = true;
 						break;
+					}
+				}
+				if(!found
+						&& StringUtils.isNotEmpty(locale.getLanguage())
+						&& locale.getLanguage().length() >= 2) {
+					//if we do not find the exact match, find a match based on the country code
+					String userLanguage = locale.getLanguage().substring(0, 2);
+					for(String eula_locale : (List<String>) eula.get("available_languages")) {
+						if(eula_locale.toLowerCase().startsWith(userLanguage.toLowerCase())) {					
+							//found language match
+							userLocale = eula_locale;
+							found = true;
+							break;
+						}
 					}
 				}
 			}
 		}
-		if(StringUtils.isEmpty(userLocale)) {
-			//default to english:
+		if(!found) {
+			//user's locale was null or their langauge was not found, set default to english:
 			userLocale = EULA_DEFAULT_LOCALE;
 		}
-			
+
 		return userLocale;
 	}
 
@@ -1507,8 +1529,8 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	}
 	
 	@Override
-	public void webhookEvent(HttpServletRequest request, String providerName, Optional<String> customParam) {
-		log.info("providerName: " + providerName + ", custom: " + (customParam.isPresent() ? customParam.get() : ""));
+	public void webhookEvent(HttpServletRequest request, int providerId, Optional<String> customParam) {
+		log.info("providerId: " + providerId + ", custom: " + (customParam.isPresent() ? customParam.get() : ""));
 		int errors = 0;
 		int success = 0;
 		String body = null;

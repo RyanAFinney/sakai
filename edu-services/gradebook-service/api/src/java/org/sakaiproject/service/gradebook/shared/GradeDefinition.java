@@ -16,6 +16,7 @@
 
 package org.sakaiproject.service.gradebook.shared;
 
+import org.apache.commons.lang3.BooleanUtils;
 import java.util.Date;
 
 /**
@@ -116,8 +117,8 @@ public class GradeDefinition {
 		this.gradeReleased = gradeReleased;
 	}
 	
-	public void setExcused(boolean excuse){
-		this.excused = excuse;
+	public void setExcused(Boolean excuse){
+		this.excused = BooleanUtils.toBoolean(excuse);
 	}
 
 	/**

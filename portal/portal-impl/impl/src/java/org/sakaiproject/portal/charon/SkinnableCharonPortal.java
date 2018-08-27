@@ -194,7 +194,6 @@ public class SkinnableCharonPortal extends HttpServlet implements Portal
 	private static final String INCLUDE_TITLE = "include-title";
 
     // SAK-22384
-    private static final String MATHJAX_ENABLED = "mathJaxAllowed";
     private static final String MATHJAX_SRC_PATH_SAKAI_PROP = "portal.mathjax.src.path";
     private static final String MATHJAX_ENABLED_SAKAI_PROP = "portal.mathjax.enabled";
     private static final boolean ENABLED_SAKAI_PROP_DEFAULT = true;
@@ -574,7 +573,7 @@ public class SkinnableCharonPortal extends HttpServlet implements Portal
 		rcontext.put("allSites", siteView.getRenderContextObject());
 
 		includeLogin(rcontext, req, session);
-		includeBottom(rcontext);
+		includeBottom(rcontext, site);
 
 		return rcontext;
 	}
@@ -1315,7 +1314,7 @@ public class SkinnableCharonPortal extends HttpServlet implements Portal
         {
                 if (site != null)
                 {                           
-                    String strMathJaxEnabledForSite = site.getProperties().getProperty(MATHJAX_ENABLED);
+                    String strMathJaxEnabledForSite = site.getProperties().getProperty(Site.PROP_SITE_MATHJAX_ALLOWED);
                     if (StringUtils.isNotBlank(strMathJaxEnabledForSite))
                     {
                         if (Boolean.valueOf(strMathJaxEnabledForSite))
@@ -1575,7 +1574,7 @@ public class SkinnableCharonPortal extends HttpServlet implements Portal
 		return "Sakai Charon Portal";
 	}
 
-	public void includeBottom(PortalRenderContext rcontext)
+	public void includeBottom(PortalRenderContext rcontext, Site site)
 	{
 		if (rcontext.uses(INCLUDE_BOTTOM))
 		{
@@ -1679,9 +1678,26 @@ public class SkinnableCharonPortal extends HttpServlet implements Portal
 				rcontext.put("bottomNav", l);
 			}
 
-                        boolean neoChatAvailable
-                            = ServerConfigurationService.getBoolean("portal.neochat", false)
-                                && chatHelper.checkChatPermitted(thisUser);
+                        String neoChatProperty = ServerConfigurationService.getString(Site.PROP_SITE_PORTAL_NEOCHAT, "never");
+                        boolean neoChatAvailable = false;
+ 
+                        if ("true".equals(neoChatProperty) || "false".equals(neoChatProperty)) {
+                            neoChatAvailable = Boolean.valueOf(neoChatProperty);
+                            if (site != null) {
+                                String siteNeoChatStr = site.getProperties().getProperty(Site.PROP_SITE_PORTAL_NEOCHAT);
+                                if (siteNeoChatStr != null) {
+                                    neoChatAvailable = Boolean.valueOf(siteNeoChatStr);
+                                }
+                            }
+                        }
+
+                        if ("always".equals(neoChatProperty)) {
+                            neoChatAvailable = true;
+                        }
+
+                        if (!chatHelper.checkChatPermitted(thisUser)) {
+                            neoChatAvailable = false;
+                        }
 
                         rcontext.put("neoChat", neoChatAvailable);
                         rcontext.put("portalChatPollInterval", 

@@ -2524,7 +2524,7 @@ extends VelocityPortletStateAction
 		        // need to cleanup the cal references which look like /calendar/calendar/4ea74c4d-3f9e-4c32-b03f-15e7915e6051/main
 		        String eventRef = StringUtils.replace(calendarRef, "/main", "/"+stateName);
 		        String calendarEventId = state.getCalendarEventId();
-		        if (StringUtils.isNotBlank(calendarEventId)) {
+		        if (StringUtils.isNotBlank(calendarEventId) && stateName.equals("description")) {
 		            eventRef += "/"+calendarEventId;
 		        }
 		        ets.post(ets.newEvent("calendar.read", eventRef, false));
@@ -7517,6 +7517,7 @@ extends VelocityPortletStateAction
 			isOnWorkspaceTab());
 			
 			sessionManager.getCurrentSession().setAttribute(CalendarService.SESSION_CALENDAR_LIST,calRefList);
+			boolean dateDesc = sstate.getAttribute(STATE_DATE_SORT_DSC) != null;
 			
 			Reference calendarRef = EntityManager.newReference(state.getPrimaryCalendarReference());
 			
@@ -7527,7 +7528,8 @@ extends VelocityPortletStateAction
 														printType,
 														timeRangeString,
 														UserDirectoryService.getCurrentUser().getDisplayName(),
-														dailyStartTime);
+														dailyStartTime,
+														dateDesc);
 			
 			bar_print.add(new MenuEntry(rb.getString("java.print"), "").setUrl(accessPointUrl));
 		}

@@ -211,7 +211,7 @@ public class GradeSummaryTablePanel extends BasePanel {
 						if(gradeInfo == null){
 							excused = false;
 						}else{
-							excused = gradeInfo.isExcuse();
+							excused = gradeInfo.isExcused();
 						}
 
 						final String rawGrade;

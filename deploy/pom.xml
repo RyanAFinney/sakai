@@ -563,7 +563,7 @@
 
         <!-- xml -->
         <dependency>
-            <groupId>dom4j</groupId>
+            <groupId>org.dom4j</groupId>
             <artifactId>dom4j</artifactId>
             <scope>compile</scope>
         </dependency>
@@ -586,7 +586,7 @@
         </dependency>
         <dependency>
             <groupId>javax.activation</groupId>
-            <artifactId>activation</artifactId>
+            <artifactId>javax.activation-api</artifactId>
             <scope>compile</scope>
         </dependency>
         <dependency>

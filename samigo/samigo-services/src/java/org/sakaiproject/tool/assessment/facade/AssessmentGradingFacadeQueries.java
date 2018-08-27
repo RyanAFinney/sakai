@@ -1454,12 +1454,22 @@ public class AssessmentGradingFacadeQueries extends HibernateDaoSupport implemen
                 getHibernateTemplate().deleteAll(c);
                 retryCount = 0;
             } catch (Exception e) {
-                log.warn("problem inserting assessmentGrading: " + e.getMessage());
-                retryCount = persistenceHelper.retryDeadlock(e, retryCount);
+                try {
+                    getHibernateTemplate().deleteAll(mergeAll(c));
+                    retryCount = 0;
+                } catch (Exception ex) {
+                    log.warn("problem inserting assessmentGrading: " + ex.getMessage());
+                    retryCount = persistenceHelper.retryDeadlock(ex, retryCount);
+                }
             }
         }
     }
 
+    private Collection mergeAll(Collection entities) {
+        List merged = new ArrayList();
+        entities.forEach(ent->merged.add(getHibernateTemplate().merge(ent)));
+        return merged;
+    }
 
     public void saveOrUpdateAll(Collection<ItemGradingData> c) {
         int retryCount = persistenceHelper.getRetryCount();
@@ -1802,8 +1812,8 @@ public class AssessmentGradingFacadeQueries extends HibernateDaoSupport implemen
         return actualNumberRetakeHash;
     }
 
-    public Map<Long, Long> getActualNumberRetakeHash(final String agentIdString) {
-        Map<Long, Long> actualNumberRetakeHash = new HashMap<>();
+    public Map<Long, Integer> getActualNumberRetakeHash(final String agentIdString) {
+        Map<Long, Integer> actualNumberRetakeHash = new HashMap<>();
         final HibernateCallback<List<Object[]>> hcb = session -> {
             Query q = session.createQuery(
                     "select a.publishedAssessmentId, count(*) from AssessmentGradingData a, StudentGradingSummaryData s " +
@@ -1817,7 +1827,7 @@ public class AssessmentGradingFacadeQueries extends HibernateDaoSupport implemen
         };
         List<Object[]> countList = getHibernateTemplate().execute(hcb);
         for (Object[] o : countList) {
-            actualNumberRetakeHash.put((Long) o[0], (Long) o[1]);
+            actualNumberRetakeHash.put((Long) o[0], (Integer) o[1]);
         }
         return actualNumberRetakeHash;
     }

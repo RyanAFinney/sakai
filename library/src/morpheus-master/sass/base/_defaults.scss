@@ -128,16 +128,17 @@ input[type="checkbox"], input[type="radio"]{
 
 	//SAK-30977
 	&[disabled],&[disabled="disabled"],&[disabled="true"]{
-		opacity: 0.8;
+		opacity: 0.5;
 		& + label{
-			color: lighten($text-color, 10%);
+			cursor: not-allowed;
+			color: $text-color-disabled;
 		}
 	}
 }
 
 label.disabled{
-	color: lighten($text-color, 10%);
 	cursor: not-allowed;
+	color: $text-color-disabled;
 }
 
 input[type="checkbox"]{
@@ -222,6 +223,7 @@ button[class="disabled"]:hover,
 	box-shadow: none !important;
 	cursor: not-allowed;
 	text-decoration: none;
+	white-space: nowrap;
 }
 
 ul, ol {
