@@ -135,6 +135,7 @@ public class ExcuseGradeAction extends InjectableAction implements Serializable 
         }
 
 
+
         String categoryScore = "-";
 
         if (categoryId != null) {
